@@ -1,9 +1,12 @@
 import cupy as cp, cv2, numpy as np, os, pandas as pd, time, sys, io
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parent
+ASSETS_DIR = PROJECT_DIR / "assets"
 class Display:
     CHUNK_WIDTH = 3
     CHUNK_HEIGHT = 6
     NUM_CHARS = 91
-    count = 0
     get_diffs = cp.RawKernel(r'''
         extern "C" __global__
         void get_diffs(const int* x1, const int* x2, int* y, char* min_indexes, const int CHUNK_WIDTH, const int CHUNK_HEIGHT, const int WINDOW_WIDTH) {
@@ -12,7 +15,7 @@ class Display:
             int base =  (WINDOW_WIDTH * (blockIdx.x / WINDOW_WIDTH) * CHUNK_WIDTH * CHUNK_HEIGHT) + (CHUNK_WIDTH * (blockIdx.x % WINDOW_WIDTH));
             for (int i = 0; i < CHUNK_HEIGHT; i++) {       
                 for (int j = 0; j < CHUNK_WIDTH; j++) {
-                    int temp = (x1[base + (WINDOW_WIDTH * CHUNK_WIDTH * i) + j] - x2[(CHUNK_WIDTH * CHUNK_HEIGHT) * threadIdx.x + ((i * CHUNK_WIDTH) + j)] - 64);
+                    int temp = (x1[base + (WINDOW_WIDTH * CHUNK_WIDTH * i) + j] - x2[(CHUNK_WIDTH * CHUNK_HEIGHT) * threadIdx.x + ((i * CHUNK_WIDTH) + j)] - 32);
                     y[blockDim.x * blockIdx.x + threadIdx.x] += temp * temp; 
                 }
             }
@@ -39,16 +42,30 @@ class Display:
         }
         ''', 'get_diffs')
     
-    def __init__(self, video_path, num_frames, frame_rate):
+    def __init__(self, video_path):
         self.vid = cv2.VideoCapture(video_path)
-        if self.vid.isOpened():
-            self.WIDTH  = ((int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH))) // self.CHUNK_WIDTH) * self.CHUNK_WIDTH
-            self.HEIGHT = ((int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT))) // self.CHUNK_HEIGHT) * self.CHUNK_HEIGHT
-            self.WINDOW_WIDTH = self.WIDTH // self.CHUNK_WIDTH
-            self.WINDOW_HEIGHT = self.HEIGHT // self.CHUNK_HEIGHT
-            self.NUM_CHUNKS = self.WINDOW_WIDTH * self.WINDOW_HEIGHT
+        if not self.vid.isOpened():
+            raise ValueError(f"Could not open video: {video_path}")
+
+        self.WIDTH = (
+            int(self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)) // self.CHUNK_WIDTH
+        ) * self.CHUNK_WIDTH
+        self.HEIGHT = (
+            int(self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)) // self.CHUNK_HEIGHT
+        ) * self.CHUNK_HEIGHT
+        self.WINDOW_WIDTH = self.WIDTH // self.CHUNK_WIDTH
+        self.WINDOW_HEIGHT = self.HEIGHT // self.CHUNK_HEIGHT
+        self.NUM_CHUNKS = self.WINDOW_WIDTH * self.WINDOW_HEIGHT
+
+        self.NUM_FRAMES = int(self.vid.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.FRAME_RATE = float(self.vid.get(cv2.CAP_PROP_FPS))
+        if self.NUM_FRAMES <= 0:
+            raise ValueError("The video metadata does not provide a valid frame count.")
+        if self.FRAME_RATE <= 0:
+            raise ValueError("The video metadata does not provide a valid frame rate.")
+        self.count = 0
         
-        df = pd.read_csv('C:\All\Stuff\Projects\Images\lookup_out_sorted.csv')
+        df = pd.read_csv(PROJECT_DIR / "lookup_out_sorted.csv")
         letters = df.values.tolist()
         #trimming unicode value off
         INDEX_TO_UNICODE_OFFSET = 32
@@ -59,8 +76,7 @@ class Display:
                 # flipping white and black values
                 letters[i][j] = 255 - letters[i][j]
         self.letters = cp.array(letters, dtype=cp.int32)
-        self.buff = np.zeros((num_frames, self.NUM_CHUNKS), dtype=cp.uint8)
-        self.FRAME_RATE = frame_rate
+        self.buff = np.zeros((self.NUM_FRAMES, self.NUM_CHUNKS), dtype=np.uint8)
         self.FRAME_TIME = 1.0 / self.FRAME_RATE
         self.mins = cp.zeros((self.NUM_CHUNKS,), dtype=cp.uint8)
 
@@ -69,39 +85,49 @@ class Display:
 
         y = cp.zeros((self.NUM_CHUNKS, self.NUM_CHARS), dtype=cp.int32)
         self.get_diffs((self.NUM_CHUNKS,), (self.NUM_CHARS,), (img_cp, self.letters, y, self.mins, self.CHUNK_WIDTH, self.CHUNK_HEIGHT, self.WINDOW_WIDTH))
+        if self.count >= len(self.buff):
+            extra_frames = max(1, len(self.buff))
+            self.buff = np.concatenate((
+                self.buff,
+                np.zeros((extra_frames, self.NUM_CHUNKS), dtype=np.uint8),
+            ))
         self.buff[self.count] = cp.asnumpy(self.mins)
         self.count += 1
 
     def display(self):
-        t = 0
         os.system("")
-        sys.stdout.write('\033[8;' + str(self.WINDOW_HEIGHT+1) + '};' + str(self.WINDOW_WIDTH) + 't')
-        sys.stdout = io.TextIOWrapper(io.BufferedWriter(sys.stdout.buffer, 1))
+        sys.stdout.write(
+            f"\033[8;{self.WINDOW_HEIGHT + 1};{self.WINDOW_WIDTH}t"
+        )
+        sys.stdout.flush()
 
-        for i in range(self.buff.shape[0]):
+        sys.stdout.write('\033[2J')
+        sys.stdout.flush()
+
+        for i in range(self.count):
             t1 = time.time()
-            # os.system( 'cls' )
-            # sys.stdout.flush()
-            sys.stdout.write('\r' + str(self.buff[i].tobytes().decode()))
-            # sys.stdout.flush()
+            frame = self.buff[i].tobytes().decode()
+            rows = [
+                frame[row * self.WINDOW_WIDTH:(row + 1) * self.WINDOW_WIDTH]
+                for row in range(self.WINDOW_HEIGHT)
+            ]
+            output = ''.join(
+                f'\033[{row_index + 1};1H{row_text}'
+                for row_index, row_text in enumerate(rows)
+            )
+            sys.stdout.write(output)
+            sys.stdout.flush()
             t2 = time.time()
             if self.FRAME_TIME - (t2 - t1) > 0:
                 time.sleep(self.FRAME_TIME - (t2 - t1))
 
-d = Display("C:\All\Stuff\Projects\Images\\assets\\hedgehog.mp4", 900, 23.27)
-os.system("")
-resize = '\033[8;' + str(d.WINDOW_HEIGHT+1) + ';' + str(d.WINDOW_WIDTH) + 't'
-sys.stdout.write(resize)
-print("newline")
-print(d.WINDOW_WIDTH)
-print(d.WINDOW_HEIGHT)
-
-# d = Display("C:\All\Stuff\Projects\Images\\hedgehog_short.mp4", 535, 30.0)
+d = Display(str(ASSETS_DIR / "blinding_lights.mp4"))
 while(d.vid.isOpened()):
     ret, frame = d.vid.read()
-    b = True
-    if ret == True and b:
-        d.render(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+    if ret:
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray_frame = cv2.convertScaleAbs(gray_frame, alpha=1.3, beta=0)
+        d.render(gray_frame)
     else:
         break
 

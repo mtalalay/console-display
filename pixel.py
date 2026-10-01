@@ -1,14 +1,15 @@
-import sys
-sys.path.append('c:/users/mttra/appdata/local/programs/python/python310/lib/site-packages')
-
 import cv2, os, numpy, pandas as pd
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parent
+LETTERS_DIR = PROJECT_DIR / "letters"
 BLOCK_WIDTH = 22
 BLOCK_HEIGHT = 20
 
-df = pd.read_csv('C:\All\Stuff\Projects\Images\lookup.csv')
-for file in os.listdir("C:\All\Stuff\Projects\Images\letters"):
+df = pd.read_csv(PROJECT_DIR / "lookup.csv")
+for file in os.listdir(LETTERS_DIR):
     print(file)
-    img = cv2.imread("C:\All\Stuff\Projects\Images\letters\\" + file, cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread(str(LETTERS_DIR / file), cv2.IMREAD_GRAYSCALE)
 
     def check_block(col, row):
         color = 0
@@ -22,5 +23,5 @@ for file in os.listdir("C:\All\Stuff\Projects\Images\letters"):
         for bc in range(0, len(img[0]), BLOCK_WIDTH):
             row.append(check_block(bc, br))
     df.loc[len(df)] = row
-df.to_csv('C:\All\Stuff\Projects\Images\lookup_out.csv', index=False)
+df.to_csv(PROJECT_DIR / "lookup_out.csv", index=False)
 

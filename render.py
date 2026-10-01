@@ -1,11 +1,16 @@
 import cupy as cp, cv2, numpy as np, os, pandas as pd, time
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parent
+ASSETS_DIR = PROJECT_DIR / "assets"
+LETTERS_DIR = PROJECT_DIR / "letters"
 
 def sort_df():
-    df = pd.read_csv('C:\All\Stuff\Projects\Images\lookup_out.csv')
+    df = pd.read_csv(PROJECT_DIR / "lookup_out.csv")
     df2 = df.sort_values(by='unicode')
-    df2.to_csv('C:\All\Stuff\Projects\Images\lookup_out_sorted.csv', index=False)
+    df2.to_csv(PROJECT_DIR / "lookup_out_sorted.csv", index=False)
 
-df = pd.read_csv('C:\All\Stuff\Projects\Images\lookup_out_sorted.csv')
+df = pd.read_csv(PROJECT_DIR / "lookup_out_sorted.csv")
 letters = df.values.tolist()
 #trimming unicode value off
 INDEX_TO_UNICODE_OFFSET = 32
@@ -18,7 +23,9 @@ for i in range(len(letters)):
 
 CHUNK_HEIGHT  = 6
 CHUNK_WIDTH = 3
-read_img = cv2.imread("C:\All\Stuff\Projects\Images\\assets\\jett.jpg", cv2.IMREAD_GRAYSCALE)
+# read_img = cv2.imread(str(ASSETS_DIR / "capybara_contrast.png"), cv2.IMREAD_GRAYSCALE)
+read_img = cv2.bitwise_not(cv2.resize(cv2.imread(str(LETTERS_DIR / "70.png"), cv2.IMREAD_GRAYSCALE), (CHUNK_WIDTH * 1, CHUNK_HEIGHT * 1), interpolation=cv2.INTER_AREA))
+cv2.imwrite('output_image.jpg', read_img)
 img = read_img[0:(read_img.shape[0] // CHUNK_HEIGHT) * CHUNK_HEIGHT, 0:(read_img.shape[1] // CHUNK_WIDTH) * CHUNK_WIDTH]
 WINDOW_WIDTH = img.shape[1] // CHUNK_WIDTH
 WINDOW_HEIGHT = img.shape[0] // CHUNK_HEIGHT
