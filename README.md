@@ -1,5 +1,11 @@
 # console-display
 
+## Demo
+
+[![Watch the console-display video demo](https://img.youtube.com/vi/0Sk03KkoHuo/hqdefault.jpg)](https://youtu.be/0Sk03KkoHuo)
+
+Click the thumbnail to watch the video.
+
 ## Class-based renderer
 
 The newer entry points share the ConsoleArt class in scripts/console_art.py:
