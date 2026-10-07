@@ -1,0 +1,14 @@
+# Generated glyph lookup tables (CSV and metadata JSON)
+/tables/lookup*
+
+# Media, font, and image assets
+/assets/
+
+# Virtual Environment
+/.venv/
+
+# Output folder for rendered videos, images, and test data
+/outputs/
+
+# Cache folders for Python scripts
+/scripts/__pycache__/

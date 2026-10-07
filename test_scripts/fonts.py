@@ -1,7 +1,7 @@
 import fontforge
 from pathlib import Path
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 FONT_PATH = PROJECT_DIR / "assets" / "consola.ttf"
 LETTERS_DIR = PROJECT_DIR / "letters"
 

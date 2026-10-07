@@ -1,8 +1,9 @@
 import cupy as cp, cv2, numpy as np, os, pandas as pd, time, sys, io
 from pathlib import Path
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 ASSETS_DIR = PROJECT_DIR / "assets"
+TABLES_DIR = PROJECT_DIR / "tables"
 class Display:
     CHUNK_WIDTH = 3
     CHUNK_HEIGHT = 6
@@ -65,16 +66,12 @@ class Display:
             raise ValueError("The video metadata does not provide a valid frame rate.")
         self.count = 0
         
-        df = pd.read_csv(PROJECT_DIR / "lookup_out_sorted.csv")
+        df = pd.read_csv(TABLES_DIR / "lookup_3x6.csv")
         letters = df.values.tolist()
         #trimming unicode value off
         INDEX_TO_UNICODE_OFFSET = 32
         letters = [letters[i][1:] for i in range(len(letters))]
 
-        for i in range(len(letters)):
-            for j in range(len(letters[0])):
-                # flipping white and black values
-                letters[i][j] = 255 - letters[i][j]
         self.letters = cp.array(letters, dtype=cp.int32)
         self.buff = np.zeros((self.NUM_FRAMES, self.NUM_CHUNKS), dtype=np.uint8)
         self.FRAME_TIME = 1.0 / self.FRAME_RATE

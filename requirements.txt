@@ -2,4 +2,5 @@ cupy-cuda12x
 opencv-python
 numpy
 pandas
+psutil
 # fontforge

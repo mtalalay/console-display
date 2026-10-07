@@ -1,31 +1,26 @@
 import cupy as cp, cv2, numpy as np, os, pandas as pd, time
 from pathlib import Path
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 ASSETS_DIR = PROJECT_DIR / "assets"
 LETTERS_DIR = PROJECT_DIR / "letters"
+TABLES_DIR = PROJECT_DIR / "tables"
+OUTPUTS_DIR = PROJECT_DIR / "outputs"
 
-def sort_df():
-    df = pd.read_csv(PROJECT_DIR / "lookup_out.csv")
-    df2 = df.sort_values(by='unicode')
-    df2.to_csv(PROJECT_DIR / "lookup_out_sorted.csv", index=False)
-
-df = pd.read_csv(PROJECT_DIR / "lookup_out_sorted.csv")
+df = pd.read_csv(TABLES_DIR / "lookup_3x6.csv")
 letters = df.values.tolist()
 #trimming unicode value off
 INDEX_TO_UNICODE_OFFSET = 32
 letters = [letters[i][1:] for i in range(len(letters))]
 
-for i in range(len(letters)):
-    for j in range(len(letters[0])):
-        # flipping white and black values
-        letters[i][j] = 255 - letters[i][j]
-
 CHUNK_HEIGHT  = 6
 CHUNK_WIDTH = 3
-# read_img = cv2.imread(str(ASSETS_DIR / "capybara_contrast.png"), cv2.IMREAD_GRAYSCALE)
-read_img = cv2.bitwise_not(cv2.resize(cv2.imread(str(LETTERS_DIR / "70.png"), cv2.IMREAD_GRAYSCALE), (CHUNK_WIDTH * 1, CHUNK_HEIGHT * 1), interpolation=cv2.INTER_AREA))
-cv2.imwrite('output_image.jpg', read_img)
+read_img = cv2.imread(str(ASSETS_DIR / "capybara_contrast.png"), cv2.IMREAD_GRAYSCALE)
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+read_img = clahe.apply(read_img)
+# read_img = cv2.bitwise_not(cv2.resize(cv2.imread(str(LETTERS_DIR / "70.png"), cv2.IMREAD_GRAYSCALE), (CHUNK_WIDTH * 1, CHUNK_HEIGHT * 1), interpolation=cv2.INTER_AREA))
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+cv2.imwrite(str(OUTPUTS_DIR / 'output_image.jpg'), read_img)
 img = read_img[0:(read_img.shape[0] // CHUNK_HEIGHT) * CHUNK_HEIGHT, 0:(read_img.shape[1] // CHUNK_WIDTH) * CHUNK_WIDTH]
 WINDOW_WIDTH = img.shape[1] // CHUNK_WIDTH
 WINDOW_HEIGHT = img.shape[0] // CHUNK_HEIGHT
